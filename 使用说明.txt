@@ -1,0 +1,32 @@
+Milestro for Godot（桌面成品包）
+================================
+
+内容
+----
+- addons/milestro/     Godot 插件（含 libMilestro + GDExtension 动态库 + ICU 数据）
+- demo/                可直接用 Godot 4.7 打开的验证项目
+- scripts/             命令行验证脚本
+- src/                 GDExtension 源码
+- native_smoke/        C API 冒烟测试源码（bin/ 下有已编译可执行文件）
+- sample-text.png      一次成功渲染样例（Hello 你好 Milestro）
+
+在本机使用
+----------
+1. 用 Godot 4.7 打开 demo/ 文件夹（project.godot）
+2. 运行主场景 verify_main.tscn，应打印 GODOT_VERIFY_OK
+3. 或把 addons/milestro 复制到你自己的 Godot 项目的 addons/ 下
+
+注意
+----
+- 当前二进制为 macOS x86_64（Intel）
+- 依赖本机 Godot 4.7：/Applications/Godot.app
+- 字体验证默认使用：/Users/JimmyXiao/Milestro/tests/data/font/SourceHanSans-VF.otf.woff2.bytes
+  （完整源码与字体在 /Users/JimmyXiao/Milestro）
+
+API 示例
+--------
+var m = Milestro.new()
+print(m.get_version())
+m.register_font_from_file("/path/to/font.ttf")
+var metrics = m.render_text_metrics("Hello 你好", "Source Han Sans VF", 36.0, 512, 256)
+var img: Image = metrics["image"]

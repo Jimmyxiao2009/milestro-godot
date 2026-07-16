@@ -1,0 +1,17 @@
+[configuration]
+
+entry_symbol = "milestro_library_init"
+compatibility_minimum = "4.3"
+reloadable = true
+
+[libraries]
+
+macos = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.debug = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.release = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.editor = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.debug.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.release.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.editor.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.template_debug = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+macos.template_debug.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
