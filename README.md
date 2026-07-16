@@ -66,9 +66,24 @@ cmake --build build --target milestro_godot
 
 | Platform | Status |
 |----------|--------|
-| macOS x86_64 | Prebuilt in repo / releases |
-| macOS arm64 | Not packaged yet (build from source) |
-| Windows / Linux / Mobile | Out of scope for this release |
+| macOS x86_64 | Local + CI (`bin/macos-x86_64/`) |
+| macOS arm64 | CI (`bin/macos-arm64/`) |
+| Windows x86_64 | CI (`bin/windows-x86_64/`) |
+| Linux x86_64 | CI (`bin/linux-x86_64/`) |
+| Mobile | Not yet |
+
+Binaries are produced by GitHub Actions: **Actions → Build multiplatform GDExtension**.  
+Merged zip: release tag `v0.2.0-multiplatform` (or workflow artifact `milestro-godot-addon-multiplatform`).
+
+### Layout
+
+```
+addons/milestro/bin/
+  windows-x86_64/   milestro.windows.template_debug.x86_64.dll + libMilestro.dll + icudtl.dat
+  linux-x86_64/     libmilestro.linux.template_debug.x86_64.so + libMilestro.so + icudtl.dat
+  macos-x86_64/     libmilestro.macos.template_debug.x86_64.dylib + libMilestro.dylib + icudtl.dat
+  macos-arm64/      ...
+```
 
 ## Credits
 

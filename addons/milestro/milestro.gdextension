@@ -6,12 +6,36 @@ reloadable = true
 
 [libraries]
 
-macos = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.debug = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.release = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.editor = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.debug.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.release.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.editor.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.template_debug = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
-macos.template_debug.x86_64 = "res://addons/milestro/bin/libmilestro.macos.template_debug.dylib"
+# --- Windows x86_64 ---
+windows.debug.x86_64 = "res://addons/milestro/bin/windows-x86_64/milestro.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/milestro/bin/windows-x86_64/milestro.windows.template_debug.x86_64.dll"
+windows.editor.x86_64 = "res://addons/milestro/bin/windows-x86_64/milestro.windows.template_debug.x86_64.dll"
+windows.template_debug.x86_64 = "res://addons/milestro/bin/windows-x86_64/milestro.windows.template_debug.x86_64.dll"
+windows.template_release.x86_64 = "res://addons/milestro/bin/windows-x86_64/milestro.windows.template_debug.x86_64.dll"
+
+# --- Linux x86_64 ---
+linux.debug.x86_64 = "res://addons/milestro/bin/linux-x86_64/libmilestro.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/milestro/bin/linux-x86_64/libmilestro.linux.template_debug.x86_64.so"
+linux.editor.x86_64 = "res://addons/milestro/bin/linux-x86_64/libmilestro.linux.template_debug.x86_64.so"
+linux.template_debug.x86_64 = "res://addons/milestro/bin/linux-x86_64/libmilestro.linux.template_debug.x86_64.so"
+linux.template_release.x86_64 = "res://addons/milestro/bin/linux-x86_64/libmilestro.linux.template_debug.x86_64.so"
+
+# --- macOS (Intel) ---
+macos.debug.x86_64 = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+macos.release.x86_64 = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+macos.editor.x86_64 = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+macos.template_debug.x86_64 = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+macos.template_release.x86_64 = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+
+# --- macOS (Apple Silicon) ---
+macos.debug.arm64 = "res://addons/milestro/bin/macos-arm64/libmilestro.macos.template_debug.arm64.dylib"
+macos.release.arm64 = "res://addons/milestro/bin/macos-arm64/libmilestro.macos.template_debug.arm64.dylib"
+macos.editor.arm64 = "res://addons/milestro/bin/macos-arm64/libmilestro.macos.template_debug.arm64.dylib"
+macos.template_debug.arm64 = "res://addons/milestro/bin/macos-arm64/libmilestro.macos.template_debug.arm64.dylib"
+macos.template_release.arm64 = "res://addons/milestro/bin/macos-arm64/libmilestro.macos.template_debug.arm64.dylib"
+
+# Fallbacks without arch (older feature tag matching)
+macos.debug = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+macos.release = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+macos.editor = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"
+macos = "res://addons/milestro/bin/macos-x86_64/libmilestro.macos.template_debug.x86_64.dylib"

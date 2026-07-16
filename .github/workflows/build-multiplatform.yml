@@ -1,0 +1,312 @@
+name: Build multiplatform GDExtension
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "CMakeLists.txt"
+      - "addons/milestro/milestro.gdextension"
+      - ".github/workflows/build-multiplatform.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "CMakeLists.txt"
+      - ".github/workflows/**"
+
+permissions:
+  contents: write
+
+env:
+  MILESTRO_REPO: MorizeroDev/Milestro
+  MILESTRO_REF: master
+  GODOT_VERSION: "4.7-stable"
+  GODOTCPP_REF: master
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86_64
+            os: windows-2025
+            platform: windows
+            arch: x86_64
+            godot_zip: Godot_v4.7-stable_win64.exe.zip
+            godot_bin: Godot_v4.7-stable_win64.exe
+
+          - name: linux-x86_64
+            os: ubuntu-24.04
+            platform: linux
+            arch: x86_64
+            godot_zip: Godot_v4.7-stable_linux.x86_64.zip
+            godot_bin: Godot_v4.7-stable_linux.x86_64
+
+          - name: macos-arm64
+            os: macos-15
+            platform: macos
+            arch: arm64
+            godot_zip: Godot_v4.7-stable_macos.universal.zip
+            godot_bin: Godot.app/Contents/MacOS/Godot
+            osx_arch: arm64
+
+          - name: macos-x86_64
+            os: macos-13
+            platform: macos
+            arch: x86_64
+            godot_zip: Godot_v4.7-stable_macos.universal.zip
+            godot_bin: Godot.app/Contents/MacOS/Godot
+            osx_arch: x86_64
+
+    steps:
+      - name: Checkout milestro-godot
+        uses: actions/checkout@v4
+
+      - name: Checkout Milestro native
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.MILESTRO_REPO }}
+          ref: ${{ env.MILESTRO_REF }}
+          path: Milestro
+          submodules: recursive
+
+      - name: Checkout godot-cpp
+        uses: actions/checkout@v4
+        with:
+          repository: godotengine/godot-cpp
+          ref: ${{ env.GODOTCPP_REF }}
+          path: godot-cpp
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Setup NASM
+        uses: ilammy/setup-nasm@v1
+
+      # -------- Windows tools --------
+      - name: MSVC env (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # -------- Linux deps --------
+      - name: Install deps (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang lld ninja-build nasm xorg-dev \
+            libasound2-dev libfontconfig1-dev cmake
+
+      # -------- macOS deps --------
+      - name: Install deps (macOS)
+        if: runner.os == 'macOS'
+        run: brew install cmake ninja
+
+      # -------- Godot dump API --------
+      - name: Download Godot ${{ env.GODOT_VERSION }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p godot-dl
+          cd godot-dl
+          URL="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}/${{ matrix.godot_zip }}"
+          echo "Downloading $URL"
+          curl -L --fail -o godot.zip "$URL"
+          unzip -o godot.zip
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            chmod +x "Godot.app/Contents/MacOS/Godot"
+            GODOT_BIN="$PWD/Godot.app/Contents/MacOS/Godot"
+          elif [[ "${{ runner.os }}" == "Windows" ]]; then
+            GODOT_BIN="$PWD/${{ matrix.godot_bin }}"
+          else
+            chmod +x "${{ matrix.godot_bin }}"
+            GODOT_BIN="$PWD/${{ matrix.godot_bin }}"
+          fi
+          echo "GODOT_BIN=$GODOT_BIN" >> "$GITHUB_ENV"
+          "$GODOT_BIN" --version || true
+
+      - name: Dump extension_api.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$GODOT_BIN" --headless --dump-extension-api
+          # Godot writes extension_api.json in CWD
+          if [[ -f extension_api.json ]]; then
+            cp extension_api.json "$GITHUB_WORKSPACE/extension_api.json"
+          elif [[ -f godot-dl/extension_api.json ]]; then
+            cp godot-dl/extension_api.json "$GITHUB_WORKSPACE/extension_api.json"
+          else
+            find . -name extension_api.json | head
+            test -f "$GITHUB_WORKSPACE/extension_api.json"
+          fi
+          ls -lh "$GITHUB_WORKSPACE/extension_api.json"
+
+      # -------- Build native Milestro --------
+      - name: Configure Milestro (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          cmake -S Milestro -B Milestro/build_native -G Ninja ^
+            -DCMAKE_C_COMPILER=clang-cl ^
+            -DCMAKE_CXX_COMPILER=clang-cl ^
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
+            -DMILESTRO_ENABLE_CLI=OFF ^
+            -DMILESTRO_ENABLE_TESTS=OFF ^
+            -DMILESTRO_BUILD_SHARED_LIBS=ON
+
+      - name: Configure Milestro (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cmake -S Milestro -B Milestro/build_native -G Ninja \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMILESTRO_ENABLE_CLI=OFF \
+            -DMILESTRO_ENABLE_TESTS=OFF \
+            -DMILESTRO_BUILD_SHARED_LIBS=ON
+
+      - name: Configure Milestro (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cmake -S Milestro -B Milestro/build_native -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_OSX_ARCHITECTURES=${{ matrix.osx_arch }} \
+            -DMILESTRO_ENABLE_CLI=OFF \
+            -DMILESTRO_ENABLE_TESTS=OFF \
+            -DMILESTRO_BUILD_SHARED_LIBS=ON
+
+      - name: Build Milestro
+        run: cmake --build Milestro/build_native --target Milestro -j 4
+
+      - name: Locate libMilestro
+        shell: bash
+        run: |
+          set -euo pipefail
+          find Milestro/build_native -name 'libMilestro*' -o -name 'Milestro.dll' -o -name 'Milestro.lib' 2>/dev/null | head -40
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            LIBDIR=$(dirname "$(find Milestro/build_native -name 'libMilestro.dll' -o -name 'Milestro.dll' | head -1)")
+          else
+            LIBDIR=$(dirname "$(find Milestro/build_native -name 'libMilestro.*' | head -1)")
+          fi
+          echo "MILESTRO_LIB_DIR=$LIBDIR" >> "$GITHUB_ENV"
+          echo "Found native lib dir: $LIBDIR"
+          ls -la "$LIBDIR"
+
+      # -------- Build GDExtension --------
+      - name: Configure GDExtension (Windows)
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: |
+          cmake -S . -B build_gdext -G Ninja ^
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo ^
+            -DCMAKE_C_COMPILER=clang-cl ^
+            -DCMAKE_CXX_COMPILER=clang-cl ^
+            -DMILESTRO_ROOT=%GITHUB_WORKSPACE%/Milestro ^
+            -DMILESTRO_LIB_DIR=%MILESTRO_LIB_DIR% ^
+            -DGODOTCPP_DIR=%GITHUB_WORKSPACE%/godot-cpp ^
+            -DGODOTCPP_CUSTOM_API_FILE=%GITHUB_WORKSPACE%/extension_api.json ^
+            -DGODOTCPP_TARGET=template_debug
+
+      - name: Configure GDExtension (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          EXTRA=()
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            EXTRA+=(-DCMAKE_OSX_ARCHITECTURES=${{ matrix.osx_arch }})
+          fi
+          cmake -S . -B build_gdext -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DMILESTRO_ROOT="$GITHUB_WORKSPACE/Milestro" \
+            -DMILESTRO_LIB_DIR="$MILESTRO_LIB_DIR" \
+            -DGODOTCPP_DIR="$GITHUB_WORKSPACE/godot-cpp" \
+            -DGODOTCPP_CUSTOM_API_FILE="$GITHUB_WORKSPACE/extension_api.json" \
+            -DGODOTCPP_TARGET=template_debug \
+            "${EXTRA[@]}"
+
+      - name: Build GDExtension
+        run: cmake --build build_gdext --target milestro_godot -j 4
+
+      - name: List packaged binaries
+        shell: bash
+        run: |
+          find addons/milestro/bin -type f | sort
+          ls -laR addons/milestro/bin || true
+
+      - name: Upload platform artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: milestro-godot-${{ matrix.name }}
+          path: addons/milestro/bin/${{ matrix.platform }}-${{ matrix.arch }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  package:
+    name: Merge addon package
+    needs: build
+    runs-on: ubuntu-latest
+    if: always() && needs.build.result != 'cancelled'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all platform artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Assemble multiplatform addon
+        run: |
+          set -euo pipefail
+          mkdir -p dist/addons/milestro/bin
+          cp addons/milestro/milestro.gdextension dist/addons/milestro/
+          cp addons/milestro/plugin.cfg dist/addons/milestro/ 2>/dev/null || true
+          cp addons/milestro/plugin.gd dist/addons/milestro/ 2>/dev/null || true
+
+          # Each artifact is the contents of bin/<platform-arch>/
+          for d in artifacts/milestro-godot-*; do
+            name=$(basename "$d")
+            # milestro-godot-windows-x86_64 -> windows-x86_64
+            plat=${name#milestro-godot-}
+            echo "Packing $plat from $d"
+            mkdir -p "dist/addons/milestro/bin/$plat"
+            cp -a "$d"/. "dist/addons/milestro/bin/$plat/" || cp -a "$d"/* "dist/addons/milestro/bin/$plat/" || true
+          done
+
+          echo "=== Final tree ==="
+          find dist -type f | sort
+          cd dist
+          zip -r ../milestro-godot-addon-multiplatform.zip addons
+          ls -lh ../milestro-godot-addon-multiplatform.zip
+
+      - name: Upload merged addon zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: milestro-godot-addon-multiplatform
+          path: milestro-godot-addon-multiplatform.zip
+          retention-days: 30
+
+      - name: Attach to latest release (if tag workflow / manual)
+        if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Prefer existing v0.1.0 or create/update v0.2.0-multiplatform
+          TAG="v0.2.0-multiplatform"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" milestro-godot-addon-multiplatform.zip --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" milestro-godot-addon-multiplatform.zip \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Milestro for Godot $TAG" \
+              --notes "Multi-platform GDExtension builds (Windows / Linux / macOS). See workflow Build multiplatform GDExtension."
+          fi
