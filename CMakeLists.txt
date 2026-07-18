@@ -118,6 +118,7 @@ add_library(milestro_godot SHARED
     src/milestro_reusable_text_draw_snapshot.cpp
     src/milestro_input_box.cpp
     src/milestro_input_box_draw_snapshot.cpp
+    src/milestro_native_compat.cpp
     src/milestro_font_family_info.cpp
     src/milestro_font_face_info.cpp
     src/milestro_unicode_normalizer.cpp
@@ -131,6 +132,8 @@ target_include_directories(milestro_godot PRIVATE
     "${MILESTRO_ROOT}/include"
     "${MILESTRO_ROOT}/include/Milestro/game"
     "${MILESTRO_ROOT}/include/Milestro/common"
+    "${MILESTRO_ROOT}/ext/skia"
+    "${MILESTRO_ROOT}/ext/spdlog/include"
 )
 
 target_compile_definitions(milestro_godot PRIVATE MILESTRO_DLL)

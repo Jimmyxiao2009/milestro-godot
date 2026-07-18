@@ -1,6 +1,7 @@
 #include "milestro_input_box_draw_snapshot.h"
 
 #include "milestro_canvas.h"
+#include "milestro_native_compat.h"
 
 #include <Milestro/game/milestro_game_interface.h>
 #include <godot_cpp/core/class_db.hpp>
@@ -26,5 +27,5 @@ void MilestroInputBoxDrawSnapshot::set_native(milestro::skia::textlayout::InputB
 
 bool MilestroInputBoxDrawSnapshot::paint(Ref<MilestroCanvas> canvas, float x, float y, float width, float height) {
 	if (!native_snapshot || !canvas.is_valid() || !canvas->get_native()) return false;
-	return MilestroSkiaTextlayoutInputBoxDrawSnapshotPaint(native_snapshot, canvas->get_native(), x, y, width, height) == 0;
+	return MilestroGodotInputBoxDrawSnapshotPaint(native_snapshot, canvas->get_native(), x, y, width, height) == 0;
 }
