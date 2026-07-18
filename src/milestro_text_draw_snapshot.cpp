@@ -2,6 +2,7 @@
 
 #include "milestro_canvas.h"
 #include "milestro_font.h"
+#include "milestro_native_compat.h"
 #include <Milestro/game/milestro_game_interface.h>
 #include <godot_cpp/core/class_db.hpp>
 
@@ -56,5 +57,5 @@ Dictionary MilestroTextDrawSnapshot::measure_text() const {
 
 void MilestroTextDrawSnapshot::paint_text(Ref<MilestroCanvas> canvas, float x, float y) {
 	if (!native_snapshot || !canvas.is_valid() || !canvas->get_native()) return;
-	MilestroSkiaTextDrawSnapshotPaint(native_snapshot, canvas->get_native(), x, y);
+	MilestroGodotTextDrawSnapshotPaint(native_snapshot, canvas->get_native(), x, y);
 }
