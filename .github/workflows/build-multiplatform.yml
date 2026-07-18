@@ -139,14 +139,20 @@ jobs:
         run: |
           set -euo pipefail
           "$GODOT_BIN" --headless --dump-extension-api
-          # Godot writes extension_api.json in CWD
+          # Godot normally writes extension_api.json in CWD, which can already
+          # be GITHUB_WORKSPACE. Avoid copying a file onto itself: cp exits 1
+          # for that case on the hosted Linux/macOS runners.
+          API_SOURCE=""
           if [[ -f extension_api.json ]]; then
-            cp extension_api.json "$GITHUB_WORKSPACE/extension_api.json"
+            API_SOURCE="$PWD/extension_api.json"
           elif [[ -f godot-dl/extension_api.json ]]; then
-            cp godot-dl/extension_api.json "$GITHUB_WORKSPACE/extension_api.json"
-          else
-            find . -name extension_api.json | head
+            API_SOURCE="$PWD/godot-dl/extension_api.json"
+          fi
+          if [[ -z "$API_SOURCE" ]]; then
+            find . -name extension_api.json -print
             test -f "$GITHUB_WORKSPACE/extension_api.json"
+          elif [[ ! -e "$GITHUB_WORKSPACE/extension_api.json" ]] || ! cmp -s "$API_SOURCE" "$GITHUB_WORKSPACE/extension_api.json"; then
+            cp "$API_SOURCE" "$GITHUB_WORKSPACE/extension_api.json"
           fi
           ls -lh "$GITHUB_WORKSPACE/extension_api.json"
 
