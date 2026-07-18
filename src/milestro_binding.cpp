@@ -1,5 +1,20 @@
 #include "milestro_binding.h"
 
+#include "milestro_font.h"
+#include "milestro_text_style.h"
+#include "milestro_paragraph_style.h"
+#include "milestro_strut_style.h"
+#include "milestro_paragraph_builder.h"
+#include "milestro_paragraph.h"
+#include "milestro_canvas.h"
+#include "milestro_image.h"
+#include "milestro_svg.h"
+#include "milestro_text_draw_snapshot.h"
+#include "milestro_reusable_text_draw_snapshot.h"
+#include "milestro_input_box.h"
+#include "milestro_font_family_info.h"
+#include "milestro_font_face_info.h"
+
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -7,6 +22,7 @@
 #include <vector>
 
 #include <Milestro/game/milestro_game_interface.h>
+#include <Milestro/game/milestro_game_model.h>
 
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/variant/utility_functions.hpp>
@@ -38,6 +54,25 @@ bool read_file_bytes(const std::string &path, std::vector<uint8_t> &out) {
 	return static_cast<bool>(f);
 }
 
+String bytes_to_string(milestro::game::model::BytesWrapper *wrapper) {
+	if (!wrapper) return String();
+	uint8_t *ptr = nullptr;
+	uint64_t size = 0;
+	const int64_t rc = MilestroGameModelBytesWrapperCStr(wrapper, ptr, size);
+	String result;
+	if (rc == kOk && ptr && size > 0) {
+		result = String::utf8(reinterpret_cast<const char *>(ptr), static_cast<int>(size));
+	}
+	milestro::game::model::DataEnvelop *envelop = wrapper;
+	MilestroGameModelDataEnvelopDestroy(envelop);
+	return result;
+}
+
+String borrowed_utf8_to_string(uint8_t *ptr, uint64_t size) {
+	if (!ptr || size == 0) return String();
+	return String::utf8(reinterpret_cast<const char *>(ptr), static_cast<int>(size));
+}
+
 int count_non_zero(const std::vector<uint8_t> &pixels) {
 	int non_zero = 0;
 	for (uint8_t b : pixels) {
@@ -51,8 +86,34 @@ int count_non_zero(const std::vector<uint8_t> &pixels) {
 } // namespace
 
 void Milestro::_bind_methods() {
+	// Version
 	ClassDB::bind_method(D_METHOD("get_version"), &Milestro::get_version);
+	ClassDB::bind_method(D_METHOD("is_icu_loaded"), &Milestro::is_icu_loaded);
+	ClassDB::bind_method(D_METHOD("set_font_fallback_enabled", "enabled"), &Milestro::set_font_fallback_enabled);
+	ClassDB::bind_method(D_METHOD("is_font_fallback_enabled"), &Milestro::is_font_fallback_enabled);
+	ClassDB::bind_method(D_METHOD("clear_font_caches"), &Milestro::clear_font_caches);
+	ClassDB::bind_method(D_METHOD("to_upper", "locale", "text"), &Milestro::to_upper);
+	ClassDB::bind_method(D_METHOD("to_lower", "locale", "text"), &Milestro::to_lower);
+
+	// Font Registry
 	ClassDB::bind_method(D_METHOD("register_font_from_file", "path"), &Milestro::register_font_from_file);
+	ClassDB::bind_method(D_METHOD("get_registered_font_families"), &Milestro::get_registered_font_families);
+	ClassDB::bind_method(D_METHOD("get_registered_font_faces"), &Milestro::get_registered_font_faces);
+
+	// Factory Methods
+	ClassDB::bind_method(D_METHOD("create_font", "family", "weight", "size"), &Milestro::create_font);
+	ClassDB::bind_method(D_METHOD("create_text_style"), &Milestro::create_text_style);
+	ClassDB::bind_method(D_METHOD("create_paragraph_style"), &Milestro::create_paragraph_style);
+	ClassDB::bind_method(D_METHOD("create_strut_style"), &Milestro::create_strut_style);
+	ClassDB::bind_method(D_METHOD("create_paragraph_builder", "style"), &Milestro::create_paragraph_builder);
+	ClassDB::bind_method(D_METHOD("create_canvas", "width", "height"), &Milestro::create_canvas);
+	ClassDB::bind_method(D_METHOD("create_image_from_file", "path"), &Milestro::create_image_from_file);
+	ClassDB::bind_method(D_METHOD("create_svg_from_file", "path"), &Milestro::create_svg_from_file);
+	ClassDB::bind_method(D_METHOD("create_text_draw_snapshot", "font", "text", "r", "g", "b", "a"), &Milestro::create_text_draw_snapshot);
+	ClassDB::bind_method(D_METHOD("create_reusable_text_draw_snapshot", "font", "capacity", "r", "g", "b", "a"), &Milestro::create_reusable_text_draw_snapshot);
+	ClassDB::bind_method(D_METHOD("create_input_box", "para_style", "text_style"), &Milestro::create_input_box);
+
+	// Backward-compatible render methods
 	ClassDB::bind_method(D_METHOD("render_text", "text", "font_family", "font_size", "width", "height"),
 			&Milestro::render_text);
 	ClassDB::bind_method(D_METHOD("render_text_metrics", "text", "font_family", "font_size", "width", "height"),
@@ -77,11 +138,200 @@ Dictionary Milestro::get_version() const {
 	return d;
 }
 
+bool Milestro::is_icu_loaded() const {
+	int32_t loaded = 0;
+	return MilestroIsICULoaded(loaded) == kOk && loaded != 0;
+}
+
+bool Milestro::set_font_fallback_enabled(bool enabled) const {
+	return MilestroSkiaFontCollectionSetFontFallbackEnabled(enabled ? 1 : 0) == kOk;
+}
+
+bool Milestro::is_font_fallback_enabled() const {
+	int32_t enabled = 0;
+	return MilestroSkiaFontCollectionIsFontFallbackEnabled(enabled) == kOk && enabled != 0;
+}
+
+bool Milestro::clear_font_caches() const {
+	return MilestroSkiaFontCollectionClearCaches() == kOk;
+}
+
+String Milestro::to_upper(const String &locale, const String &text) const {
+	const std::string locale_utf8 = to_utf8(locale);
+	const std::string text_utf8 = to_utf8(text);
+	milestro::game::model::BytesWrapper *wrapper = nullptr;
+	const int64_t rc = MilestroUnicodeCaseMapToUpper(wrapper,
+			reinterpret_cast<uint8_t *>(const_cast<char *>(locale_utf8.data())),
+			reinterpret_cast<uint8_t *>(const_cast<char *>(text_utf8.data())));
+	return rc == kOk ? bytes_to_string(wrapper) : String();
+}
+
+String Milestro::to_lower(const String &locale, const String &text) const {
+	const std::string locale_utf8 = to_utf8(locale);
+	const std::string text_utf8 = to_utf8(text);
+	milestro::game::model::BytesWrapper *wrapper = nullptr;
+	const int64_t rc = MilestroUnicodeCaseMapToLower(wrapper,
+			reinterpret_cast<uint8_t *>(const_cast<char *>(locale_utf8.data())),
+			reinterpret_cast<uint8_t *>(const_cast<char *>(text_utf8.data())));
+	return rc == kOk ? bytes_to_string(wrapper) : String();
+}
+
 int64_t Milestro::register_font_from_file(const String &path) const {
 	const std::string p = to_utf8(path);
 	return MilestroSkiaFontRegistryRegisterFontFromFile(
 			reinterpret_cast<uint8_t *>(const_cast<char *>(p.data())),
 			static_cast<uint64_t>(p.size()));
+}
+
+TypedArray<MilestroFontFamilyInfo> Milestro::get_registered_font_families() const {
+	TypedArray<MilestroFontFamilyInfo> result;
+	milestro::skia::MilestroFontFamilyList* list = nullptr;
+	int64_t rc = MilestroSkiaFontRegistryGetRegisteredFontFamilyList(list);
+	if (rc != kOk || !list) return result;
+
+	uint64_t size = 0;
+	MilestroSkiaFontFamilyListGetSize(list, size);
+	for (uint64_t i = 0; i < size; ++i) {
+		milestro::skia::MilestroFontFamilyInfo* info = nullptr;
+		MilestroSkiaFontFamilyListRefElementAt(list, info, i);
+		if (!info) continue;
+		Ref<MilestroFontFamilyInfo> gd_info;
+		gd_info.instantiate();
+		uint8_t *name = nullptr;
+		uint64_t name_size = 0;
+		if (MilestroSkiaFontFamilyInfoGetName(info, name, name_size) == kOk) {
+			gd_info->set_name(borrowed_utf8_to_string(name, name_size));
+		}
+		result.push_back(gd_info);
+		MilestroSkiaFontFamilyInfoDestroy(info);
+	}
+	MilestroSkiaFontFamilyListDestroy(list);
+	return result;
+}
+
+TypedArray<MilestroFontFaceInfo> Milestro::get_registered_font_faces() const {
+	TypedArray<MilestroFontFaceInfo> result;
+	milestro::skia::MilestroFontFaceList* list = nullptr;
+	int64_t rc = MilestroSkiaFontRegistryGetRegisteredFontFaceList(list);
+	if (rc != kOk || !list) return result;
+
+	uint64_t size = 0;
+	MilestroSkiaFontFaceListGetSize(list, size);
+	for (uint64_t i = 0; i < size; ++i) {
+		milestro::skia::MilestroFontFaceInfo* info = nullptr;
+		MilestroSkiaFontFaceListRefElementAt(list, info, i);
+		if (!info) continue;
+		Ref<MilestroFontFaceInfo> gd_info;
+		gd_info.instantiate();
+		uint8_t *source_path = nullptr;
+		uint64_t source_path_size = 0;
+		uint8_t *family_name = nullptr;
+		uint64_t family_name_size = 0;
+		int32_t face_index = 0;
+		int32_t instance_index = 0;
+		int32_t packed_index = 0;
+		int32_t weight = 0;
+		int32_t width = 0;
+		int32_t slant = 0;
+		int32_t fixed_pitch = 0;
+		MilestroSkiaFontFaceInfoGetSourcePath(info, source_path, source_path_size);
+		MilestroSkiaFontFaceInfoGetFamilyName(info, family_name, family_name_size);
+		MilestroSkiaFontFaceInfoGetFaceIndex(info, face_index);
+		MilestroSkiaFontFaceInfoGetInstanceIndex(info, instance_index);
+		MilestroSkiaFontFaceInfoGetPackedIndex(info, packed_index);
+		MilestroSkiaFontFaceInfoGetWeight(info, weight);
+		MilestroSkiaFontFaceInfoGetWidth(info, width);
+		MilestroSkiaFontFaceInfoGetSlant(info, slant);
+		MilestroSkiaFontFaceInfoGetFixedPitch(info, fixed_pitch);
+		gd_info->set_values(borrowed_utf8_to_string(source_path, source_path_size),
+				borrowed_utf8_to_string(family_name, family_name_size), face_index,
+				instance_index, packed_index, weight, width, slant, fixed_pitch != 0);
+		result.push_back(gd_info);
+		MilestroSkiaFontFaceInfoDestroy(info);
+	}
+	MilestroSkiaFontFaceListDestroy(list);
+	return result;
+}
+
+Ref<MilestroFont> Milestro::create_font(const String& family, int32_t weight, float size) const {
+	Ref<MilestroFont> font;
+	font.instantiate();
+	const std::string family_utf8 = to_utf8(family);
+	milestro::skia::Font *native_font = nullptr;
+	const int64_t rc = MilestroSkiaFontRegistryResolveTypeface(native_font,
+			reinterpret_cast<uint8_t *>(const_cast<char *>(family_utf8.data())),
+			static_cast<uint64_t>(family_utf8.size()), weight, size, 1);
+	if (rc != kOk || !native_font) return Ref<MilestroFont>();
+	font->set_native(native_font);
+	return font;
+}
+
+Ref<MilestroTextStyle> Milestro::create_text_style() const {
+	Ref<MilestroTextStyle> style;
+	style.instantiate();
+	return style;
+}
+
+Ref<MilestroParagraphStyle> Milestro::create_paragraph_style() const {
+	Ref<MilestroParagraphStyle> style;
+	style.instantiate();
+	return style;
+}
+
+Ref<MilestroStrutStyle> Milestro::create_strut_style() const {
+	Ref<MilestroStrutStyle> style;
+	style.instantiate();
+	return style;
+}
+
+Ref<MilestroParagraphBuilder> Milestro::create_paragraph_builder(Ref<MilestroParagraphStyle> style) const {
+	if (!style.is_valid()) return Ref<MilestroParagraphBuilder>();
+	Ref<MilestroParagraphBuilder> builder;
+	builder.instantiate();
+	builder->init(style);
+	return builder;
+}
+
+Ref<MilestroCanvas> Milestro::create_canvas(int32_t width, int32_t height) const {
+	Ref<MilestroCanvas> canvas;
+	canvas.instantiate();
+	if (!canvas->create(width, height)) return Ref<MilestroCanvas>();
+	return canvas;
+}
+
+Ref<MilestroImage> Milestro::create_image_from_file(const String& path) const {
+	Ref<MilestroImage> image;
+	image.instantiate();
+	if (!image->load_from_file(path)) return Ref<MilestroImage>();
+	return image;
+}
+
+Ref<MilestroSvg> Milestro::create_svg_from_file(const String& path) const {
+	Ref<MilestroSvg> svg;
+	svg.instantiate();
+	if (!svg->load_from_file(path)) return Ref<MilestroSvg>();
+	return svg;
+}
+
+Ref<MilestroTextDrawSnapshot> Milestro::create_text_draw_snapshot(Ref<MilestroFont> font, const String& text, int32_t r, int32_t g, int32_t b, int32_t a) const {
+	Ref<MilestroTextDrawSnapshot> snapshot;
+	snapshot.instantiate();
+	if (!snapshot->create(font, text, r, g, b, a)) return Ref<MilestroTextDrawSnapshot>();
+	return snapshot;
+}
+
+Ref<MilestroReusableTextDrawSnapshot> Milestro::create_reusable_text_draw_snapshot(Ref<MilestroFont> font, int64_t capacity, int32_t r, int32_t g, int32_t b, int32_t a) const {
+	Ref<MilestroReusableTextDrawSnapshot> snapshot;
+	snapshot.instantiate();
+	if (!snapshot->create(font, capacity, r, g, b, a)) return Ref<MilestroReusableTextDrawSnapshot>();
+	return snapshot;
+}
+
+Ref<MilestroInputBox> Milestro::create_input_box(Ref<MilestroParagraphStyle> para_style, Ref<MilestroTextStyle> text_style) const {
+	Ref<MilestroInputBox> box;
+	box.instantiate();
+	if (!box->init(para_style, text_style)) return Ref<MilestroInputBox>();
+	return box;
 }
 
 Ref<Image> Milestro::render_text(const String &text, const String &font_family, double font_size,

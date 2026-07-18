@@ -12,6 +12,8 @@ set(MILESTRO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../Milestro" CACHE PATH "Path to 
 set(MILESTRO_LIB_DIR "${MILESTRO_ROOT}/cmake-build-relwithdebinfo/lib" CACHE PATH "Directory containing libMilestro")
 set(GODOTCPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/godot-cpp" CACHE PATH "godot-cpp source")
 set(GODOTCPP_CUSTOM_API_FILE "${CMAKE_CURRENT_SOURCE_DIR}/extension_api.json" CACHE FILEPATH "Godot extension_api.json")
+set(GODOTCPP_GIT_TAG "master" CACHE STRING "godot-cpp branch or tag used when GODOTCPP_DIR is missing")
+option(GODOTCPP_FETCH "Fetch godot-cpp automatically when it is not present" ON)
 set(GODOTCPP_PRECISION "single" CACHE STRING "" FORCE)
 set(GODOTCPP_TARGET "template_debug" CACHE STRING "godot-cpp target: template_debug|template_release")
 
@@ -73,6 +75,23 @@ message(STATUS "Install dir=${MILESTRO_GDEXT_BIN_SUBDIR}")
 # ---------------------------------------------------------------------------
 # godot-cpp
 # ---------------------------------------------------------------------------
+if(NOT EXISTS "${GODOTCPP_DIR}/CMakeLists.txt")
+    if(NOT GODOTCPP_FETCH)
+        message(FATAL_ERROR "godot-cpp is missing at ${GODOTCPP_DIR}. Set GODOTCPP_DIR or enable GODOTCPP_FETCH.")
+    endif()
+    include(FetchContent)
+    message(STATUS "godot-cpp not found; fetching ${GODOTCPP_GIT_TAG} from GitHub")
+    FetchContent_Declare(godotcpp
+        GIT_REPOSITORY https://github.com/godotengine/godot-cpp.git
+        GIT_TAG ${GODOTCPP_GIT_TAG}
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_GetProperties(godotcpp)
+    if(NOT godotcpp_POPULATED)
+        FetchContent_Populate(godotcpp)
+    endif()
+    set(GODOTCPP_DIR "${godotcpp_SOURCE_DIR}")
+endif()
 if(EXISTS "${GODOTCPP_CUSTOM_API_FILE}")
     set(GODOTCPP_CUSTOM_API_FILE "${GODOTCPP_CUSTOM_API_FILE}" CACHE FILEPATH "" FORCE)
 endif()
@@ -84,6 +103,28 @@ add_subdirectory(${GODOTCPP_DIR} godot-cpp-build EXCLUDE_FROM_ALL)
 add_library(milestro_godot SHARED
     src/register_types.cpp
     src/milestro_binding.cpp
+    src/milestro_font.cpp
+    src/milestro_text_style.cpp
+    src/milestro_paragraph_style.cpp
+    src/milestro_strut_style.cpp
+    src/milestro_paragraph_builder.cpp
+    src/milestro_paragraph.cpp
+    src/milestro_canvas.cpp
+    src/milestro_image.cpp
+    src/milestro_path.cpp
+    src/milestro_vertex_data.cpp
+    src/milestro_svg.cpp
+    src/milestro_text_draw_snapshot.cpp
+    src/milestro_reusable_text_draw_snapshot.cpp
+    src/milestro_input_box.cpp
+    src/milestro_input_box_draw_snapshot.cpp
+    src/milestro_native_compat.cpp
+    src/milestro_font_family_info.cpp
+    src/milestro_font_face_info.cpp
+    src/milestro_unicode_normalizer.cpp
+    src/milestro_unicode_segmenter.cpp
+    src/milestro_unicode_transliterator.cpp
+    src/milestro_string_comparator.cpp
 )
 
 target_include_directories(milestro_godot PRIVATE
@@ -91,6 +132,8 @@ target_include_directories(milestro_godot PRIVATE
     "${MILESTRO_ROOT}/include"
     "${MILESTRO_ROOT}/include/Milestro/game"
     "${MILESTRO_ROOT}/include/Milestro/common"
+    "${MILESTRO_ROOT}/ext/skia"
+    "${MILESTRO_ROOT}/ext/spdlog/include"
 )
 
 target_compile_definitions(milestro_godot PRIVATE MILESTRO_DLL)
