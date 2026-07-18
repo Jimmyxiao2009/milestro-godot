@@ -17,9 +17,14 @@ This repository provides a thin **GDExtension** over the real Milestro C plugin 
 
 1. Download the **Release** asset `milestro-godot-macos-x86_64-vX.Y.Z.zip`, **or** clone this repo (prebuilt dylibs are included under `addons/milestro/bin/`).
 2. Open this folder in **Godot 4.7+** (`project.godot`).
-3. Run the main scene `verify_main.tscn` — you should see `GODOT_VERIFY_OK`.
+3. Run `scripts/run_verify.sh`, or open `verify_main.tscn` directly — the output should contain `GODOT_VERIFY_OK`.
 
 Copy `addons/milestro` into your own project’s `addons/` to use the plugin elsewhere.
+
+For ready-made Godot controls, add `addons/milestro/MilestroTextLabel.gd` or
+`addons/milestro/MilestroInputBoxControl.gd` to a scene. The first renders rich
+text into a `TextureRect`; the second connects the native InputBox editing model
+to Godot keyboard and mouse events.
 
 ### GDScript
 
@@ -54,12 +59,15 @@ cmake -S /path/to/Milestro -B /path/to/Milestro/cmake-build-relwithdebinfo -G Ni
   -DCMAKE_BUILD_TYPE=RelWithDebInfo
 cmake --build /path/to/Milestro/cmake-build-relwithdebinfo --target Milestro
 
-# 2) Build this GDExtension (needs godot-cpp + dumped extension_api.json)
-# See CMakeLists.txt — set MILESTRO_ROOT / MILESTRO_LIB_DIR.
+# 2) Build this GDExtension. CMake fetches godot-cpp automatically unless
+#    GODOTCPP_DIR points at a local checkout. Set MILESTRO_ROOT / MILESTRO_LIB_DIR.
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DMILESTRO_ROOT=/path/to/Milestro \
   -DMILESTRO_LIB_DIR=/path/to/Milestro/cmake-build-relwithdebinfo/lib
 cmake --build build --target milestro_godot
+
+# If GitHub is unavailable, download godot-cpp separately and pass:
+#   -DGODOTCPP_DIR=/path/to/godot-cpp
 ```
 
 ## Platform status
