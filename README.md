@@ -54,6 +54,9 @@ MILESTRO_FONT_PATH=/path/to/font.bytes \
   Godot --headless --path . \
   --rendering-method gl_compatibility --rendering-driver opengl3 \
   --scene tests/milestro_full_test.tscn --quit-after 20
+
+# Run the full API suite with a result-aware runner (12/12 is required).
+MILESTRO_FONT_PATH=/path/to/font.bytes ./scripts/run_full_test.sh
 ```
 
 The expected markers are `SMOKE_OK`, `GODOT_VERIFY_OK` and `12/12`.
