@@ -95,6 +95,11 @@ func _run_all_test() -> void:
 	else:
 		_fail("通过 %d/%d, 失败 %d" % [tests_passed, total, tests_failed])
 
+	# This scene is also used by the headless runner.  Return the test result
+	# to Godot instead of relying on --quit-after, otherwise a failed test can
+	# still produce a successful process exit.
+	get_tree().quit(0 if tests_failed == 0 else 1)
+
 func _test_version() -> bool:
 	if not ClassDB.class_exists("Milestro"):
 		_fail("GDExtension 未加载")

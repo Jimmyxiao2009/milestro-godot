@@ -195,7 +195,6 @@ if(APPLE)
         INSTALL_RPATH "@loader_path"
         BUILD_WITH_INSTALL_RPATH TRUE
     )
-    target_link_options(milestro_godot PRIVATE "LINKER:-rpath,@loader_path")
 elseif(UNIX)
     set_target_properties(milestro_godot PROPERTIES
         BUILD_RPATH "\$ORIGIN"
